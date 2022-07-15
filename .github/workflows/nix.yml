@@ -89,7 +89,6 @@ jobs:
               ;;
           esac
           curl \
-            --fail \
             -X POST \
             -u "admin:$(cat "$NEXUS_ADMIN_PASSWORD_FILE")" \
             -H "Content-Type: multipart/form-data" \
