@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - run: dpkg --info bundle.deb
     - name: Assume the AWS role
       if: github.event_name != 'pull_request'
       uses: aws-actions/configure-aws-credentials@v1
