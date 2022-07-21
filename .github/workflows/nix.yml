@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   upload-deb:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -17,13 +18,14 @@ jobs:
         lfs: true
     - run: dpkg --info bundle.deb
     - name: Assume the AWS role
-      if: github.event_name != 'pull_request'
+      continue-on-error: true
+      id: configure-aws-credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
         role-to-assume: arn:aws:iam::223121549624:role/hhvm-github-actions
         aws-region: us-west-2
     - name: Decrypt the GPG key
-      if: github.event_name != 'pull_request' && runner.os == 'Linux'
+      if: steps.configure-aws-credentials.outcome == 'success'
       run: |
         set -o pipefail
         GPG_KEY_FILE="$(mktemp)" &&
@@ -34,12 +36,13 @@ jobs:
         base64 --decode > "$GPG_KEY_FILE" &&
         echo "GPG_KEY_FILE=$GPG_KEY_FILE" >> $GITHUB_ENV
     - name: Fetch the Nexus admin password
-      if: github.event_name != 'pull_request' && runner.os == 'Linux'
+      if: steps.configure-aws-credentials.outcome == 'success'
       run: |
         NEXUS_ADMIN_PASSWORD_FILE="$(mktemp)" &&
-        aws secretsmanager get-secret-value --secret-id nexus-admin-password-testing-3 --query SecretString --output text > "$NEXUS_ADMIN_PASSWORD_FILE" &&
+        aws secretsmanager get-secret-value --secret-id nexus-admin-password-prod --query SecretString --output text > "$NEXUS_ADMIN_PASSWORD_FILE" &&
         echo "NEXUS_ADMIN_PASSWORD_FILE=$NEXUS_ADMIN_PASSWORD_FILE" >> $GITHUB_ENV
     - name: Upload the deb package
+      if: steps.configure-aws-credentials.outcome == 'success'
       run: |
         set -e
         GPG_KEY="$(cat "$GPG_KEY_FILE")"
@@ -51,7 +54,7 @@ jobs:
               -s -w "%{http_code}" \
               -X GET \
               -u "admin:$(cat "$NEXUS_ADMIN_PASSWORD_FILE")" \
-              "http://nexus-testing-3-lb-1753098265.us-west-2.elb.amazonaws.com/service/rest/v1/repositories/deb-$1"
+              "http://nexus-prod-lb-384239604.us-west-2.elb.amazonaws.com/service/rest/v1/repositories/deb-$1"
           )"
           case "$GET_DISTRIBUTION_STATUS_CODE" in
             200)
@@ -63,7 +66,7 @@ jobs:
                 -u "admin:$(cat "$NEXUS_ADMIN_PASSWORD_FILE")" \
                 -H "Content-Type: application/json" \
                 --data-binary @- \
-                http://nexus-testing-3-lb-1753098265.us-west-2.elb.amazonaws.com/service/rest/v1/repositories/apt/hosted \
+                http://nexus-prod-lb-384239604.us-west-2.elb.amazonaws.com/service/rest/v1/repositories/apt/hosted \
                 << EOF
         {
           "name": "deb-$1",
@@ -86,8 +89,8 @@ jobs:
         EOF
               ;;
             *)
-              echo "Unexpected HTTP status $GET_DISTRIBUTION_STATUS_CODE when
-              fetching http://nexus-testing-3-lb-1753098265.us-west-2.elb.amazonaws.com/service/rest/v1/repositories/deb-$1"
+              echo Unexpected HTTP status $GET_DISTRIBUTION_STATUS_CODE when \
+                fetching "http://nexus-prod-lb-384239604.us-west-2.elb.amazonaws.com/service/rest/v1/repositories/deb-$1"
               ;;
           esac
           curl \
@@ -95,6 +98,13 @@ jobs:
             -u "admin:$(cat "$NEXUS_ADMIN_PASSWORD_FILE")" \
             -H "Content-Type: multipart/form-data" \
             --data-binary @bundle.deb \
-            "http://nexus-testing-3-lb-1753098265.us-west-2.elb.amazonaws.com/repository/deb-$1/"
+            "http://nexus-prod-lb-384239604.us-west-2.elb.amazonaws.com/repository/deb-$1/"
         }
-        upload nightly
+        if [[ "$GITHUB_REF_NAME" =~ HHVM-([0-9]+\.[0-9]+)\.[0-9]+ ]]
+        then
+          upload release-"${BASH_REMATCH[1]}"
+          upload release
+        elif [[ "$GITHUB_REF_NAME" =~ nightly-([0-9]+\.[0-9]+\.[0-9]+) ]]
+        then
+          upload nightly
+        fi
