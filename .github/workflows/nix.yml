@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   upload-deb:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
     - run: sudo apt-get install s3fs
