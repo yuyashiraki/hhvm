@@ -17,6 +17,7 @@ jobs:
         lfs: true
     - run: sudo apt-get install fuse
     - run: sudo wget --output-document=/usr/bin/goofys https://github.com/kahing/goofys/releases/latest/download/goofys
+    - run: chmod +x /usr/bin/goofys
     - run: dpkg --info bundle.deb
     - name: Assume the AWS role
       continue-on-error: true
