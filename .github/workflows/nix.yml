@@ -11,8 +11,10 @@ permissions:
 jobs:
   upload-deb:
     runs-on: ubuntu-latest
+    container:
+      image: nixos/nix
     steps:
-    - run: sudo apt-get install s3fs
+    - run: nix-env -iA nixos.s3fs
     - uses: actions/checkout@v3
       with:
         lfs: true
