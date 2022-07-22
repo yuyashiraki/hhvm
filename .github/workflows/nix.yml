@@ -11,8 +11,6 @@ permissions:
 jobs:
   upload-deb:
     runs-on: ubuntu-latest
-    container:
-      image: nixos/nix
     steps:
     - uses: actions/checkout@v3
       with:
