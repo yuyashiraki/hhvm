@@ -15,7 +15,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         lfs: true
-    - run: sudo apt install fuse-utils
+    - run: sudo apt-get install fuse
     - run: sudo wget --output-document=/usr/bin/goofys https://github.com/kahing/goofys/releases/latest/download/goofys
     - run: dpkg --info bundle.deb
     - name: Assume the AWS role
